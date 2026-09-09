@@ -1,0 +1,4 @@
+Tool: built-in image editor.
+Input: user-supplied /Users/mac/Downloads/Sabi water.png
+Output: sabi-water-logo.png
+Prompt: Use case: background-extraction. Edit target: attached Sabi Water logo. Produce a faithful transparent-background cutout of this EXACT logo for a website header and footer. Remove white background and surrounding empty margins; crop closely to complete artwork with a small 3% safety margin. Preserve original artwork precisely: tilted light-blue water bottle at left, blue SABI WATER lettering and central tall water-drop splash motif. Preserve lettering, letter positions, shapes, blue palette and white highlights INSIDE artwork. Do not redesign, retype, add shadows, add outlines, alter proportions or introduce any new elements. Crisp clean edges, genuine alpha transparency outside the logo, not a white or checkerboard painted background. Wide aspect ratio matching tightly cropped artwork.
