@@ -35,6 +35,17 @@ function validSignature(raw, signature, key) {
 function matchesPayment(row, data) {
   return data?.status === 'success' && data.reference === row.reference && data.amount === row.amount_kobo && data.currency === 'NGN' && data.domain === row.mode && data.customer?.email?.toLowerCase() === row.email.toLowerCase()
 }
+async function consumeOrderCart(client, row) {
+  await client.query('INSERT INTO customer_carts (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [row.user_id])
+  const cartResult = await client.query('SELECT items FROM customer_carts WHERE user_id = $1 FOR UPDATE', [row.user_id])
+  const cart = cartResult.rows[0].items
+  for (const line of row.details.lines) {
+    const remaining = Math.max(0, (cart[line.id] || 0) - line.qty)
+    if (remaining) cart[line.id] = remaining
+    else delete cart[line.id]
+  }
+  await client.query('UPDATE customer_carts SET items = $2, updated_at = NOW() WHERE user_id = $1', [row.user_id, cart])
+}
 async function settlePayment(pool, data) {
   const client = await pool.connect()
   try {
@@ -42,24 +53,23 @@ async function settlePayment(pool, data) {
     const result = await client.query('SELECT * FROM customer_payments WHERE reference = $1 FOR UPDATE', [data.reference])
     const row = result.rows[0]
     if (!row) { await client.query('COMMIT'); return null }
+    if (row.payment_source === 'wallet') throw Object.assign(new Error('Wallet orders cannot be settled through Paystack.'), { status: 409 })
     if (!matchesPayment(row, data)) throw Object.assign(new Error('Payment details do not match this order.'), { status: 409 })
     if (row.status !== 'paid') {
       await client.query("UPDATE customer_payments SET status = 'paid', paid_at = NOW() WHERE reference = $1", [row.reference])
-      await client.query('INSERT INTO customer_carts (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [row.user_id])
-      const cartResult = await client.query('SELECT items FROM customer_carts WHERE user_id = $1 FOR UPDATE', [row.user_id])
-      const cart = cartResult.rows[0].items
-      for (const line of row.details.lines) {
-        const remaining = Math.max(0, (cart[line.id] || 0) - line.qty)
-        if (remaining) cart[line.id] = remaining
-        else delete cart[line.id]
+      if (!row.cancelled_at) {
+        await consumeOrderCart(client, row)
       }
-      await client.query('UPDATE customer_carts SET items = $2, updated_at = NOW() WHERE user_id = $1', [row.user_id, cart])
+    }
+    if (row.cancelled_at) {
+      await client.query("UPDATE customer_payments SET refund_status = 'queued' WHERE reference = $1 AND refund_status = 'none'", [row.reference])
+      if (row.refund_status === 'none') row.refund_status = 'queued'
     }
     await client.query('COMMIT')
     return paymentOrder({ ...row, status: 'paid' })
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
 }
 function paymentOrder(row) {
-  return { ...row.details, reference: row.reference, status: row.status === 'paid' ? (row.delivery_status || 'Confirmed') : 'Awaiting payment', paymentStatus: row.status, paymentMode: row.mode, preview: row.mode === 'test', authorizationUrl: row.authorization_url || null }
+  return { ...row.details, paymentSource: row.payment_source || 'paystack', reference: row.reference, cancelledAt: row.cancelled_at, cancellationReason: row.cancellation_reason, refundStatus: row.refund_status, status: row.cancelled_at ? 'Cancelled' : row.status === 'paid' ? (row.delivery_status || 'Confirmed') : 'Awaiting payment', paymentStatus: row.status, paymentMode: row.mode, preview: row.mode === 'test', authorizationUrl: row.cancelled_at ? null : row.authorization_url || null }
 }
-module.exports = { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder }
+module.exports = { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder, consumeOrderCart }

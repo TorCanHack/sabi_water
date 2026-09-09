@@ -9,6 +9,7 @@ async function updateDelivery(pool, reference, nextStatus) {
     const result = await client.query('SELECT * FROM customer_payments WHERE reference = $1 FOR UPDATE', [reference])
     const row = result.rows[0]
     if (!row) throw Object.assign(new Error('Order not found.'), { status: 404 })
+    if (row.cancelled_at) throw Object.assign(new Error('Cancelled orders cannot be dispatched.'), { status: 409 })
     if (row.status !== 'paid') throw Object.assign(new Error('Confirm payment before updating delivery.'), { status: 409 })
     const current = row.delivery_status || 'Confirmed'
     if (nextStatus !== current && STATUSES.indexOf(nextStatus) !== STATUSES.indexOf(current) + 1) {

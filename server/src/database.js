@@ -1,19 +1,11 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const { Pool } = require('pg')
+const { databaseConfig } = require('./databaseConfig')
+const { logError } = require('./runtime')
 
-const usesDiscreteConfig = Boolean(process.env.PGHOST)
-const pool = new Pool(usesDiscreteConfig ? {
-  host: process.env.PGHOST,
-  port: Number(process.env.PGPORT) || 5432,
-  user: process.env.PGUSER,
-  password: process.env.PGPASSWORD,
-  database: process.env.PGDATABASE || 'postgres',
-  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
-} : {
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false,
-})
+const pool = new Pool(databaseConfig())
+pool.on('error', error => logError('database_pool_error', error))
 
 async function initializeDatabase() {
   if (!process.env.DATABASE_URL && !process.env.PGHOST) {

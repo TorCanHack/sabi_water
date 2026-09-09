@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { validateAddress, validateSchedule, STATUSES, orderStatus } from '../../shared/commerce.mjs'
 import { apiRequest } from './api'
 
-const blank = { addresses: [], orders: [], selectedId: '' }
+const blank = { wallet: null, addresses: [], orders: [], selectedId: '' }
 function readGuest() {
   try {
     const data = JSON.parse(localStorage.getItem('sabi-guest-deliveries'))
@@ -22,7 +22,7 @@ export function useCustomerData(user) {
     let active = true
     async function refresh() {
       try {
-        const data = user ? await Promise.all([apiRequest('/customer/addresses'), apiRequest('/customer/orders')]).then(([a, o]) => ({ addresses: a.addresses, orders: o.orders })) : readGuest()
+        const data = user ? await Promise.all([apiRequest('/customer/addresses'), apiRequest('/customer/orders'), apiRequest('/customer/wallet')]).then(([a, o, w]) => ({ addresses: a.addresses, orders: o.orders, wallet: w.wallet })) : readGuest()
         if (active) setState(previous => ({ owner, loading: false, error: '', data: { ...data, selectedId: previous.owner === owner && data.addresses.some(a => a.id === previous.data.selectedId) ? previous.data.selectedId : data.selectedId || data.addresses[0]?.id || '' } }))
       } catch (error) {
         if (active) setState(previous => ({ owner, data: previous.owner === owner ? previous.data : blank, loading: false, error: error.message }))

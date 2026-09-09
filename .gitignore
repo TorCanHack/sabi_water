@@ -1,0 +1,44 @@
+# Local environment files; examples must contain placeholders only.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Dependencies and generated output
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.nyc_output/
+.vite/
+
+# Logs and local runtime data
+logs/
+*.log
+*.log.*
+*.pid
+*.pid.lock
+*.local
+
+# Private keys, certificates with private keys, and database backups
+*.pem
+*.key
+*.p12
+*.pfx
+*.dump
+*.sql.gz
+*.sql.zip
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+*~

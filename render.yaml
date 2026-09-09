@@ -1,0 +1,28 @@
+# Keep the repository root: server imports ../shared at runtime.
+services:
+  - type: web
+    name: sabi-water-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci --prefix server --omit=dev
+    startCommand: npm start --prefix server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "1"
+      - key: FRONTEND_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL
+        value: "true"
+      - key: PAYSTACK_MODE
+        value: test
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_CALLBACK_URL
+        sync: false

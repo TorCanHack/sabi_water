@@ -1,0 +1,22 @@
+# Allow only backend source and shared modules into the build context.
+**
+!server/
+!server/package.json
+!server/package-lock.json
+!server/server.js
+!server/schema.sql
+!server/src/
+!server/src/**
+!server/scripts/
+!server/scripts/**
+!shared/
+!shared/**
+**/.env
+**/.env.*
+**/*.log
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.dump
+**/*.sql.gz

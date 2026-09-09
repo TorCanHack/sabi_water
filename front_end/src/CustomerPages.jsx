@@ -1,3 +1,4 @@
+import { WalletPanel } from './Wallet'
 import { PaymentActions } from './PaymentStatus'
 import { AddressBook, OrderStatus } from './Delivery'
 import { addressText, deliveryText } from '../../shared/commerce.mjs'
@@ -8,7 +9,7 @@ export function CustomerHome({ customer, user, history, navigate, reorder }) {
 }
 
 function downloadReceipt(order) {
-  const text = [order.paymentStatus === 'paid' && !order.preview ? 'SABI WATER — PAYMENT RECEIPT' : 'SABI WATER — TEST / UNPAID ORDER', order.paymentStatus === 'paid' ? `Payment confirmed. Delivery status: ${order.status}.` : 'No confirmed payment or delivery.', order.reference, addressText(order.address), order.address.landmark, order.address.instructions, deliveryText(order), ...order.lines.map(p => `${p.qty} × ${p.name}: ${money(p.price * p.qty)}`), `Total: ${money(order.total)}`, order.paymentStatus ? `Paystack ${order.paymentMode} — ${order.paymentStatus}` : 'Payment on delivery — unpaid'].join('\n')
+  const text = [order.paymentStatus === 'paid' && !order.preview ? 'SABI WATER — PAYMENT RECEIPT' : 'SABI WATER — TEST / UNPAID ORDER', order.paymentStatus === 'paid' ? `Payment confirmed. Delivery status: ${order.status}.` : 'No confirmed payment or delivery.', order.status === 'Cancelled' ? `Cancelled: ${order.cancellationReason}. Refund: ${order.refundStatus || 'not required'}.` : '', order.reference, addressText(order.address), order.address.landmark, order.address.instructions, deliveryText(order), ...order.lines.map(p => `${p.qty} × ${p.name}: ${money(p.price * p.qty)}`), `Total: ${money(order.total)}`, order.paymentStatus ? `${order.paymentSource === 'wallet' ? 'Wallet' : 'Paystack'} ${order.paymentMode} — ${order.paymentStatus}` : 'Payment on delivery — unpaid'].join('\n')
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url
@@ -30,16 +31,9 @@ export function CustomerAccount({ user, customer, navigate, signOut }) {
     <details open><summary>Personal details</summary>{user ? <div><p>{user.name}</p><p>{user.email}</p><small>Profile editing is not available yet.</small></div> : <p>Your personal details appear here after you sign in.</p>}</details>
     <details><summary>Saved addresses</summary><AddressBook customer={customer} user={user} /></details>
     <details className="account-wallet"><summary>Wallet</summary>
-      <div className="customer-card wallet-card">
-        <div className="wallet-heading"><h2>Your water wallet</h2><span className="status-tag">Coming soon</span></div>
-        <p>Keep money here for water orders and recurring deliveries.</p>
-        <div className="wallet-balance"><span>Preview balance</span><strong>{money(0)}</strong></div>
-        <button type="button" className="primary" disabled aria-describedby="wallet-topup-hint">Top up wallet</button>
-        <p id="wallet-topup-hint">Wallet top-ups and automatic deductions are not available yet. No money is held in this preview.</p>
-      </div>
-      <div className="wallet-history"><h3>Transaction history</h3><p>No wallet activity yet. Your top-ups, payments, and deductions will appear here once wallet payments launch.</p></div>
+      <WalletPanel key={`${user?.id || 'guest'}:${customer.data.wallet?.mode || ''}`} user={user} wallet={customer.data.wallet} error={customer.error} navigate={navigate} />
     </details>
-    <details><summary>Payment methods</summary><p>Pay by card, bank transfer, USSD, or bank account when online payments are enabled. Pay on delivery remains a preview. Saved payment methods are not available yet.</p></details>
+    <details><summary>Payment methods</summary><p>Pay with your wallet balance, or use card, bank transfer, USSD, or bank account through Paystack. Pay on delivery remains a preview. Saved payment methods are not available yet.</p></details>
     <details><summary>Notifications</summary><p>No notifications. Order and delivery alerts will be available with live ordering.</p></details>
     <details><summary>Help and support</summary><section className="help-guide" id="how-it-works"><div><div className="eyebrow">LESS LIFTING. MORE LIVING.</div><h2>Water runs,<br />without the run.</h2></div><div className="steps">{[['01', 'Pick your favourites', 'Choose your brand and how much you need.'], ['02', 'Tell us where', 'Add your home or office address in the estate.'], ['03', 'We’ll take it from here', 'We bring your water. Have your empties ready for exchanges.']].map(([n, title, detail]) => <div className="step" key={n}><span>{n}</span><div><h3>{title}</h3><p>{detail}</p></div></div>)}</div></section><p>Delivery coverage: Brains &amp; Hammers, Galadimawa, Abuja.</p><p>Have an empty bottle ready for each dispenser exchange. Paystack checkout displays whether payments are live or test. Delivery dispatch is not yet connected.</p><p>A customer support contact and issue reporting will be available before launch.</p></details>
     <details><summary>Settings</summary><p>Account preferences will be available in a future release.</p></details>

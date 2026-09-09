@@ -3,24 +3,29 @@ const express = require('express')
 const cors = require('cors')
 const { pool, initializeDatabase } = require('./src/database')
 const { hashPassword, verifyPassword } = require('./src/passwords')
+const { runtimeConfig, logError, installShutdown } = require('./src/runtime')
 
-const { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder } = require('./src/paystack')
+const { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder, consumeOrderCart } = require('./src/paystack')
+
+const { initializeTopup, settleTopup, debitWallet, walletView, topupView } = require('./src/wallet')
+
+const { recordRefund, startRefundWorker } = require('./src/refunds')
 
 const app = express()
-const PORT = Number(process.env.PORT || 3000)
+const config = runtimeConfig()
 const SESSION_COOKIE = 'sabi_session'
 const SESSION_DAYS = 30
 const AUTH_WINDOW_MS = 15 * 60 * 1000
 const AUTH_ATTEMPT_LIMIT = 20
 const authAttempts = new Map()
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5174').split(',').map((origin) => origin.trim())
+const allowedOrigins = config.origins
 
 function businessPadiOwnerId() {
   const value = String(process.env.BUSINESS_PADI_OWNER_ID || '').trim()
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value : null
 }
 
-app.set('trust proxy', 1)
+app.set('trust proxy', config.trustProxy)
 app.disable('x-powered-by')
 app.use(cors({ origin: allowedOrigins, credentials: true }))
 app.post('/api/payments/paystack/webhook', express.raw({ type: 'application/json', limit: '100kb' }), async (request, response, next) => {
@@ -30,7 +35,13 @@ app.post('/api/payments/paystack/webhook', express.raw({ type: 'application/json
     try { event = JSON.parse(request.body.toString('utf8')) } catch { return response.sendStatus(400) }
     if (event.event === 'charge.success') {
       if (!event.data?.reference) return response.sendStatus(400)
-      await settlePayment(pool, event.data)
+      if (String(event.data.reference).startsWith('WALLET-')) await settleTopup(pool, event.data)
+      else await settlePayment(pool, event.data)
+    }
+    if (['refund.pending', 'refund.processing', 'refund.processed', 'refund.failed', 'refund.needs-attention'].includes(event.event)) {
+      const reference = event.data?.transaction_reference || event.data?.transaction?.reference
+      if (!reference || event.data?.status !== event.event.slice(7)) return response.sendStatus(400)
+      await recordRefund(pool, reference, event.data)
     }
     response.sendStatus(200)
   } catch (error) { next(error) }
@@ -38,7 +49,7 @@ app.post('/api/payments/paystack/webhook', express.raw({ type: 'application/json
 app.use(express.json({ limit: '20kb' }))
 app.get('/api/payments/config', (_request, response) => {
   const { enabled, mode } = paymentConfig()
-  response.set('Cache-Control', 'no-store').json({ enabled, mode, businessConnected: Boolean(businessPadiOwnerId()) })
+  response.set('Cache-Control', 'no-store').json({ enabled, mode, walletEnabled: true, businessConnected: Boolean(businessPadiOwnerId()) })
 })
 
 function limitAuthAttempts(request, response, next) {
@@ -103,12 +114,13 @@ function publicUser(row) {
   return { id: String(row.id), name: row.full_name, email: row.email }
 }
 
-app.get('/api/health', async (_request, response, next) => {
+app.get('/api/health', async (_request, response) => {
+  response.set('Cache-Control', 'no-store')
   try {
-    await pool.query('SELECT 1')
+    await pool.query({ text: 'SELECT 1', query_timeout: 3000 })
     response.json({ ok: true })
-  } catch (error) {
-    next(error)
+  } catch {
+    response.status(503).json({ ok: false })
   }
 })
 
@@ -278,9 +290,9 @@ app.delete('/api/customer/addresses/:id', requireCustomer, async (request, respo
 })
 app.get('/api/customer/orders', requireCustomer, async (request, response, next) => {
   try {
-    const result = await pool.query('SELECT reference, details, status FROM customer_preview_orders WHERE user_id = $1 ORDER BY created_at DESC', [request.customerId])
+    const result = await pool.query('SELECT reference, details, status, cancelled_at, cancellation_reason FROM customer_preview_orders WHERE user_id = $1 ORDER BY created_at DESC', [request.customerId])
     const payments = await pool.query('SELECT * FROM customer_payments WHERE user_id = $1 ORDER BY created_at DESC', [request.customerId])
-    response.set('Cache-Control', 'no-store').json({ orders: [...payments.rows.map(paymentOrder), ...result.rows.map(row => ({ ...row.details, reference: row.reference, status: row.status }))].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) })
+    response.set('Cache-Control', 'no-store').json({ orders: [...payments.rows.map(paymentOrder), ...result.rows.map(row => ({ ...row.details, reference: row.reference, status: row.cancelled_at ? 'Cancelled' : row.status, cancelledAt: row.cancelled_at, cancellationReason: row.cancellation_reason }))].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)) })
   } catch (error) { next(error) }
 })
 async function buildOrder(body) {
@@ -313,15 +325,43 @@ app.post('/api/customer/orders', requireCustomer, async (request, response, next
   } catch (error) { next(error) }
 })
 
+app.get('/api/customer/wallet', requireCustomer, async (request, response, next) => {
+  try {
+    const wallet = await walletView(pool, request.customerId, request.query.before)
+    wallet.topupsEnabled = wallet.topupsEnabled && (wallet.mode !== 'live' || Boolean(businessPadiOwnerId()))
+    response.set('Cache-Control', 'no-store').json({ wallet })
+  }
+  catch (error) { next(error) }
+})
+app.post('/api/customer/wallet/topups', requireCustomer, async (request, response, next) => {
+  try {
+    if (paymentConfig().mode === 'live' && !businessPadiOwnerId()) return response.status(503).json({ error: 'Wallet top-ups are unavailable until store fulfilment is connected.' })
+    response.status(201).json({ topup: await initializeTopup(pool, request.customerId, request.body) })
+  } catch (error) { next(error) }
+})
+app.post('/api/customer/wallet/topups/:reference/verify', requireCustomer, async (request, response, next) => {
+  try {
+    const result = await pool.query('SELECT * FROM customer_wallet_topups WHERE reference = $1 AND user_id = $2', [request.params.reference, request.customerId])
+    const row = result.rows[0]
+    if (!row) return response.status(404).json({ error: 'Top-up not found.' })
+    if (row.status === 'paid') return response.json({ topup: topupView(row) })
+    if (row.mode !== paymentConfig().mode) return response.status(409).json({ error: 'This top-up belongs to a different payment mode.' })
+    const data = await paystack(`/transaction/verify/${encodeURIComponent(row.reference)}`)
+    if (data.status !== 'success') return response.status(409).json({ error: 'Top-up payment is not confirmed yet. If you have paid, wait and check again.' })
+    if (!matchesPayment(row, data)) return response.status(409).json({ error: 'Payment details do not match this wallet top-up.' })
+    response.json({ topup: await settleTopup(pool, data) })
+  } catch (error) { next(error) }
+})
+
 app.post('/api/customer/payments', requireCustomer, async (request, response, next) => {
   let client
   try {
     const config = paymentConfig()
-    if (!config.enabled) return response.status(503).json({ error: 'Online payments are not configured yet.' })
+    if (!config.enabled && request.body?.paymentMethod !== 'wallet') return response.status(503).json({ error: 'Online payments are not configured yet.' })
     const businessId = businessPadiOwnerId()
     if (config.mode === 'live' && !businessId) return response.status(503).json({ error: 'Business Padi order fulfilment is not configured yet.' })
     const paymentMethod = request.body?.paymentMethod || 'card'
-    if (!['card', 'bank_transfer', 'ussd', 'bank'].includes(paymentMethod)) return response.status(400).json({ error: 'Choose a valid payment method.' })
+    if (!['card', 'bank_transfer', 'ussd', 'bank', 'wallet'].includes(paymentMethod)) return response.status(400).json({ error: 'Choose a valid payment method.' })
     const checkoutId = request.body?.checkoutId
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(checkoutId)) return response.status(400).json({ error: 'Invalid checkout ID.' })
     client = await pool.connect()
@@ -330,6 +370,7 @@ app.post('/api/customer/payments', requireCustomer, async (request, response, ne
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`${request.customerId}:${checkoutId}`])
     const existing = await client.query('SELECT * FROM customer_payments WHERE user_id = $1 AND checkout_id = $2', [request.customerId, checkoutId])
     if (existing.rows[0]) {
+      if (existing.rows[0].mode !== config.mode || (existing.rows[0].payment_source === 'wallet') !== (paymentMethod === 'wallet')) throw Object.assign(new Error('This checkout ID belongs to a different payment method or mode.'), { status: 409 })
       await client.query('COMMIT')
       return response.json({ order: paymentOrder(existing.rows[0]) })
     }
@@ -339,7 +380,14 @@ app.post('/api/customer/payments', requireCustomer, async (request, response, ne
     const amount = Math.round(order.total * 100)
     if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 2147483647) throw Object.assign(new Error('Invalid order total.'), { status: 400 })
     const customer = await client.query('SELECT email FROM customer_users WHERE id = $1', [request.customerId])
-    await client.query('INSERT INTO customer_payments (reference, user_id, business_user_id, checkout_id, email, amount_kobo, mode, details) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [order.reference, request.customerId, businessId, checkoutId, customer.rows[0].email, amount, config.mode, order])
+    await client.query('INSERT INTO customer_payments (reference, user_id, business_user_id, checkout_id, email, amount_kobo, mode, details, payment_source) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [order.reference, request.customerId, businessId, checkoutId, customer.rows[0].email, amount, config.mode, order, paymentMethod === 'wallet' ? 'wallet' : 'paystack'])
+    if (paymentMethod === 'wallet') {
+      const row = { reference: order.reference, user_id: request.customerId, amount_kobo: amount, mode: config.mode, details: order, payment_source: 'wallet' }
+      await debitWallet(client, row)
+      await consumeOrderCart(client, row)
+      await client.query('COMMIT')
+      return response.status(201).json({ order: paymentOrder({ ...row, status: 'paid' }) })
+    }
     // Persist the reference before a network call so an ambiguous timeout never loses a charge.
     await client.query('COMMIT')
     const transaction = await paystack('/transaction/initialize', { reference: order.reference, amount, email: customer.rows[0].email, currency: 'NGN', channels: [paymentMethod], callback_url: config.callback })
@@ -364,21 +412,33 @@ app.post('/api/customer/payments/:reference/verify', requireCustomer, async (req
 })
 
 app.use((error, _request, response, _next) => {
-  console.error(error)
-  response.status(error.status || 500).json({ error: error.status ? error.message : 'Something went wrong. Please try again.' })
+  logError('request_failed', error)
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599 ? error.status : 500
+  response.status(status).json({ error: status < 500 ? error.message : 'Something went wrong. Please try again.' })
 })
 
 async function start() {
-  paymentConfig()
+  const payment = paymentConfig()
+  if (process.env.NODE_ENV === 'production' && payment.enabled && !payment.callback.startsWith('https://')) {
+    throw new Error('Production PAYSTACK_CALLBACK_URL must use HTTPS.')
+  }
   await initializeDatabase()
   await pool.query('DELETE FROM customer_sessions WHERE expires_at <= NOW()')
-  app.listen(PORT, () => console.log(`Sabi Water API listening on http://localhost:${PORT}`))
+  const server = await new Promise((resolve, reject) => {
+    const listener = app.listen(config.port, config.host, () => resolve(listener))
+    listener.once('error', reject)
+  })
+  const stopWorker = startRefundWorker(pool)
+  installShutdown(server, pool, stopWorker)
+  console.log(`Sabi Water API listening on ${config.host}:${config.port}`)
+  return server
 }
 
 if (require.main === module) {
   start().catch((error) => {
-    console.error('Could not start Sabi Water API:', error.message)
+    logError('startup_failed', error)
     process.exitCode = 1
+    void pool.end()
   })
 }
 

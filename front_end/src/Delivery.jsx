@@ -39,12 +39,14 @@ export function AddressBook({ customer, user }) {
   </>}{(error || customer.error) && <p className="error" role="alert">{error || customer.error}</p>}</div>
 }
 export function OrderStatus({ order }) {
+  if (order.status === 'Cancelled') return <div className="order-tracking" role="status"><p><strong>Order cancelled</strong></p><p>{order.cancellationReason}</p><p>{({ queued: 'Your full refund is queued.', submitting: 'Your refund is being submitted.', pending: 'Your refund is pending.', processing: 'Your refund is processing.', processed: order.paymentSource === 'wallet' ? 'Your full refund is back in your wallet and ready to spend.' : 'Paystack has processed your refund. Your bank may take up to 10 business days to credit it.', failed: 'Your refund needs assistance. Please contact the store.', 'needs-attention': 'Your refund needs assistance. Please contact the store.' })[order.refundStatus] || (order.paymentStatus === 'pending' ? 'No payment confirmed. If your payment arrives, it will be refunded automatically.' : 'No payment was taken; no refund is needed.')}</p>{order.paymentStatus === 'paid' && <p>{order.preview ? 'Test refund — no real money moved.' : order.paymentSource === 'wallet' ? 'The full payment has been returned to your wallet.' : 'The full payment is returned through Paystack to your original payment method.'}</p>}</div>
+
   const status = orderStatus(order.status)
   const step = order.paymentStatus === 'pending' ? -1 : STATUSES.indexOf(status)
   const note = order.preview
     ? 'Test order · No delivery booked.'
     : order.paymentStatus === 'paid'
-      ? `Payment confirmed · ${status}`
+      ? `${order.paymentSource === 'wallet' ? 'Paid from wallet' : 'Payment confirmed'} · ${status}`
       : order.paymentStatus === 'pending'
         ? 'Awaiting online payment confirmation'
         : `Pay on delivery · ${status}`

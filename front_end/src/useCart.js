@@ -15,11 +15,13 @@ export function useCart(user) {
     const refresh = () => { void account.sync() }
     const interval = setInterval(refresh, 10000)
     window.addEventListener('online', refresh)
+    window.addEventListener('sabi-orders-changed', refresh)
     window.addEventListener('focus', refresh)
     return () => {
       account.stop()
       clearInterval(interval)
       window.removeEventListener('online', refresh)
+      window.removeEventListener('sabi-orders-changed', refresh)
       window.removeEventListener('focus', refresh)
     }
   }, [account])

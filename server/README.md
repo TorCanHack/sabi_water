@@ -1,5 +1,7 @@
 # Sabi Water account API
 
+For Render or a VPS (Docker or plain Node), see [Deployment](DEPLOYMENT.md).
+
 Express and PostgreSQL backend for customer signup, signin, session restoration, and signout. Passwords use salted `scrypt` hashes. Login sessions use random opaque tokens; only a SHA-256 hash of each token is stored in PostgreSQL, while the browser receives the original token in an HTTP-only cookie.
 
 ## Configure PostgreSQL
@@ -122,7 +124,7 @@ Routes:
 
 Pending and paid payments appear in Orders. Returning customers can continue an existing checkout or check its status there. If initialization times out after reaching Paystack, the pending reference is retained; do not create a replacement payment until that reference is reconciled in Paystack. The callback URL alone never proves payment. Abandoned payments remain pending and never trigger fulfilment. Keep the matching key available to reconcile old pending transactions before switching modes.
 
-**Current operational limit:** paid orders are saved as **Confirmed**. Inventory reservation, Business Padi dispatch, automated refunds and recurring charges are not implemented. Receiving a payment does not book a delivery; live orders require manual fulfilment. The UI states this explicitly.
+**Current operational limit:** paid orders are saved as **Confirmed**. Inventory reservation and recurring charges are not implemented. Business Padi supports dispatch updates and cancellation with automatic Paystack refunds. Receiving a payment does not book a delivery; live orders require manual fulfilment. The UI states this explicitly.
 
 Implementation follows [Paystack accept payments](https://paystack.com/docs/payments/accept-payments/) and [webhook verification](https://paystack.com/docs/payments/webhooks/). Automated checks use a mocked Paystack API and never charge money.
 
@@ -140,3 +142,32 @@ npm run delivery:update -- SABI-ORDER-REFERENCE "Delivered"
 ```
 
 Customer endpoints cannot change delivery status. Delivery stages require operator updates; they do not automatically book a courier. Test orders remain explicitly labelled as tests.
+
+
+## Cancellation and refunds
+
+Business Padi writes cancellation reasons, staff IDs and timestamps into the shared order tables. Startup applies the additive cancellation/refund schema. Deploy this schema before the updated Business Padi API.
+
+The API runs a durable refund worker every 15 seconds using its existing Paystack key and mode. Paid cancelled orders receive a full refund through Paystack; a payment arriving after cancellation is also queued for refund. Cancellation is terminal for delivery. Wallet-paid orders are refunded immediately to their original wallet in the staff cancellation transaction; the Paystack worker only handles Paystack-funded orders.
+
+Signed `refund.pending`, `refund.processing`, `refund.processed`, `refund.failed`, and `refund.needs-attention` events update order tracking. The worker also reconciles outstanding refunds through Paystack's API. It validates amount, currency, transaction and test/live environment. Duplicate requests and delayed events cannot create a second refund or undo a processed refund.
+
+Ambiguous submissions are never automatically posted again. Staff should review flagged refunds in the Paystack dashboard, supplying bank details or retrying there when appropriate. Polling and webhooks synchronize the result. The customer order screen shows the cancellation reason and refund progress; no external messaging service is configured.
+
+See the sibling Business Padi `server/REFUNDS.md` for deployment order and the cross-project integration test. Official API reference: https://paystack.com/docs/api/refund/ .
+
+
+## Customer wallet
+
+The wallet is now available in Account and checkout. `npm run db:migrate` adds the wallet balance, top-up and append-only transaction ledgers plus the order payment source. No existing customer receives an opening credit. Deploy this migration before updating both APIs/frontends; Sabi Water also applies it on startup.
+
+- `GET /api/customer/wallet`: authenticated balance, the newest 20 ledger entries and up to 20 pending top-ups. `?before=<entry id>` pages older ledger entries.
+- `POST /api/customer/wallet/topups`: accepts an integer `amountKobo` (10,000–100,000,000, i.e. ₦100–₦1,000,000) and UUID `checkoutId`. Initializes hosted Paystack checkout once. A repeated ID returns the saved attempt; altered amounts/modes are rejected.
+- `POST /api/customer/wallet/topups/:reference/verify`: confirms only that customer's top-up. The existing Paystack callback URL works unchanged: `WALLET-` references open the wallet return screen. Signed `charge.success` webhooks also credit top-ups. Both paths validate amount, currency, reference, email and mode before crediting exactly once.
+- `POST /api/customer/payments` accepts `paymentMethod: "wallet"`. Prices are recalculated on the server. A conditional balance debit, purchase ledger entry, paid order and cart update commit atomically. Insufficient funds roll back the whole order, and repeated checkout IDs cannot debit twice.
+
+Wallet balances are isolated by customer and test/live mode. Test credits cannot fund live orders. Test mode is clearly labelled in the UI; enabling wallets does not change `PAYSTACK_MODE` or credentials. Customers can pay for an entire order from their balance; partial wallet/Paystack payments and withdrawals are not part of this release. Paystack-paid cancellations continue to refund through Paystack, never silently into a wallet.
+
+Top-up confirmations and order changes refresh balances, history and the cart; balances are not stored as spendable client-side state. Interrupted initialization stays pending for verification instead of starting another payment automatically. Keep the existing signed Paystack webhook configured and the API running.
+
+Run `TEST_DATABASE_URL=<disposable local postgres URL> npm test` for wallet/payment concurrency and authorization tests. Tests mock Paystack and use the sibling Business Padi cancellation function (`BUSINESS_PADI_DIR` can override its location). Frontend `npm test` includes decimal amount parsing and cart regressions. No real payment is made by tests.

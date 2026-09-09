@@ -116,3 +116,5 @@
 }
 @keyframes menu-pop-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.header nav.is-open{animation:none}}
+
+.wallet-topup-form{display:grid;gap:10px;max-width:440px}.wallet-topup-form label{font-weight:600}.wallet-topup-form input{min-width:0;width:100%;padding:12px;border:1px solid #b7cbdd;border-radius:8px;background:white;color:#163a59;font:inherit}.wallet-topup-form small{line-height:1.5;color:#526b82}.wallet-topup-form button{justify-self:start}.wallet-entry{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:16px 0;border-bottom:1px solid #d8e5ef}.wallet-entry>div{min-width:0}.wallet-entry small{display:block;overflow-wrap:anywhere;margin-top:5px;color:#526b82;font-size:12px}.wallet-content .wallet-history{margin-top:24px}.wallet-content .error{color:#a92323}

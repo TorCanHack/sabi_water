@@ -75,3 +75,57 @@ CREATE INDEX IF NOT EXISTS customer_payments_business_idx
 -- begin at Confirmed; unpaid orders are still presented as Awaiting payment.
 ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'Confirmed'
   CHECK (delivery_status IN ('Confirmed', 'Getting a dispatch', 'Out for delivery', 'Delivered'));
+
+-- Cancellation is independent of historical delivery and payment state.
+ALTER TABLE customer_preview_orders ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+ALTER TABLE customer_preview_orders ADD COLUMN IF NOT EXISTS cancelled_by UUID;
+ALTER TABLE customer_preview_orders ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS cancelled_by UUID;
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS refund_status TEXT NOT NULL DEFAULT 'none'
+  CHECK (refund_status IN ('none', 'queued', 'submitting', 'pending', 'processing', 'processed', 'needs-attention', 'failed'));
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS refund_id TEXT;
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS refund_error TEXT;
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS refund_checked_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS customer_payments_refund_queue_idx ON customer_payments(refund_status, refund_checked_at)
+  WHERE cancelled_at IS NOT NULL AND status = 'paid' AND refund_status <> 'processed';
+
+-- Wallet balances are isolated by customer and Paystack environment.
+ALTER TABLE customer_payments ADD COLUMN IF NOT EXISTS payment_source TEXT NOT NULL DEFAULT 'paystack'
+  CHECK (payment_source IN ('paystack', 'wallet'));
+CREATE TABLE IF NOT EXISTS customer_wallets (
+  user_id BIGINT NOT NULL REFERENCES customer_users(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
+  balance_kobo BIGINT NOT NULL DEFAULT 0 CHECK (balance_kobo BETWEEN 0 AND 9007199254740991),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, mode)
+);
+CREATE TABLE IF NOT EXISTS customer_wallet_topups (
+  reference TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES customer_users(id) ON DELETE CASCADE,
+  checkout_id UUID NOT NULL,
+  email TEXT NOT NULL,
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo BETWEEN 10000 AND 100000000),
+  mode TEXT NOT NULL CHECK (mode IN ('test', 'live')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
+  authorization_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  paid_at TIMESTAMPTZ,
+  UNIQUE (user_id, checkout_id)
+);
+CREATE INDEX IF NOT EXISTS customer_wallet_topups_user_idx ON customer_wallet_topups(user_id, mode, created_at DESC);
+CREATE TABLE IF NOT EXISTS customer_wallet_entries (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  mode TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('topup', 'purchase', 'refund')),
+  reference TEXT NOT NULL,
+  amount_kobo INTEGER NOT NULL CHECK (amount_kobo <> 0),
+  balance_after_kobo BIGINT NOT NULL CHECK (balance_after_kobo BETWEEN 0 AND 9007199254740991),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  FOREIGN KEY (user_id, mode) REFERENCES customer_wallets(user_id, mode) ON DELETE CASCADE,
+  CHECK ((kind = 'purchase' AND amount_kobo < 0) OR (kind IN ('topup', 'refund') AND amount_kobo > 0)),
+  UNIQUE (kind, reference)
+);
+CREATE INDEX IF NOT EXISTS customer_wallet_entries_user_idx ON customer_wallet_entries(user_id, mode, id DESC);
