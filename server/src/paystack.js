@@ -6,7 +6,8 @@ function paymentConfig() {
   if (!['test', 'live'].includes(mode)) throw new Error('PAYSTACK_MODE must be test or live.')
   if (key && !key.startsWith(`sk_${mode}_`)) throw new Error('Paystack secret key does not match PAYSTACK_MODE.')
   const callback = process.env.PAYSTACK_CALLBACK_URL || 'http://localhost:5174/?payment=return'
-  const url = new URL(callback)
+  let url
+  try { url = new URL(callback) } catch { throw new Error('Invalid Paystack callback URL.') }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid Paystack callback URL.')
   return { mode, key, callback, enabled: Boolean(key) }
 }

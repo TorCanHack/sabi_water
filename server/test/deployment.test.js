@@ -3,6 +3,8 @@ const assert = require('node:assert/strict')
 const { EventEmitter } = require('node:events')
 const { runtimeConfig, validatePaymentCallback, logError, installShutdown } = require('../src/runtime')
 const { databaseConfig } = require('../src/databaseConfig')
+const { spawnSync } = require('node:child_process')
+const path = require('node:path')
 
 test('deployment configuration supports direct hosting and trusted production proxies', () => {
   assert.equal(runtimeConfig({}).trustProxy, 0)
@@ -60,6 +62,30 @@ test('error logging never serializes sensitive error details', t => {
     { event: 'request_failed', code: '23505' },
     { event: 'startup_failed', code: 'UNEXPECTED_ERROR' },
   ])
+})
+
+test('failed startup identifies configuration problems without disclosing credentials', () => {
+  const baseEnv = { NODE_ENV: 'production', FRONTEND_URL: 'https://shop.example.com', PAYSTACK_MODE: 'test' }
+  const cases = [
+    { env: {}, stage: 'database_initialization', code: 'DATABASE_CONFIG_MISSING' },
+    { env: { PAYSTACK_SECRET_KEY: 'sk_test_do_not_print' }, stage: 'payment_configuration', code: 'PAYSTACK_CALLBACK_HTTPS_REQUIRED' },
+    { env: { PAYSTACK_SECRET_KEY: 'sk_live_do_not_print' }, stage: 'payment_configuration', code: 'PAYSTACK_KEY_MODE_MISMATCH' },
+    { env: { PAYSTACK_CALLBACK_URL: 'invalid-do-not-print' }, stage: 'payment_configuration', code: 'PAYSTACK_CALLBACK_INVALID' },
+  ]
+  for (const scenario of cases) {
+    // No .env loading or inherited database/payment credentials in these children.
+    const result = spawnSync(process.execPath, [path.join(__dirname, '..', 'server.js')], {
+      env: { ...baseEnv, ...scenario.env }, encoding: 'utf8', timeout: 5000,
+    })
+    assert.equal(result.status, 1, result.stderr)
+    const stages = result.stdout.trim().split('\n').map(line => JSON.parse(line))
+    assert.equal(stages.at(-1).stage, scenario.stage)
+    const failure = JSON.parse(result.stderr.trim())
+    assert.equal(failure.event, 'startup_failed')
+    assert.equal(failure.code, scenario.code)
+    assert.ok(failure.hint)
+    assert.doesNotMatch(result.stdout + result.stderr, /do_not_print|do-not-print/)
+  }
 })
 
 test('shutdown waits for requests and refund work before closing the pool, once', async () => {

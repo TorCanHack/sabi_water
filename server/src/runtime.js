@@ -24,10 +24,31 @@ function validatePaymentCallback(payment, origins, env = process.env) {
   if (url.protocol !== 'https:' && !localTest) throw new Error('Production PAYSTACK_CALLBACK_URL must use HTTPS, or a configured localhost origin in test mode.')
 }
 
-// Deliberately omit messages, stacks, SQL details, URLs, and request bodies.
+// Only fixed, reviewed explanations may appear in logs. Never print raw errors.
+const startupHints = new Map([
+  ['PAYSTACK_MODE must be test or live.', ['PAYSTACK_MODE_INVALID', 'Set PAYSTACK_MODE to test or live.']],
+  ['Paystack secret key does not match PAYSTACK_MODE.', ['PAYSTACK_KEY_MODE_MISMATCH', 'Use a Paystack secret key matching PAYSTACK_MODE.']],
+  ['Invalid Paystack callback URL.', ['PAYSTACK_CALLBACK_INVALID', 'Set PAYSTACK_CALLBACK_URL to a valid HTTP(S) URL.']],
+  ['Production PAYSTACK_CALLBACK_URL must use HTTPS, or a configured localhost origin in test mode.', ['PAYSTACK_CALLBACK_HTTPS_REQUIRED', 'Set PAYSTACK_CALLBACK_URL to your HTTPS frontend URL followed by /?payment=return.']],
+  ['DATABASE_URL or Supabase PGHOST/PGUSER/PGPASSWORD settings are required.', ['DATABASE_CONFIG_MISSING', 'Set DATABASE_URL or the PGHOST/PGUSER/PGPASSWORD settings in the hosting environment.']],
+  ['Connection terminated due to connection timeout', ['DATABASE_CONNECTION_TIMEOUT', 'Check database reachability, host, port, and network access.']],
+  ['timeout exceeded when trying to connect', ['DATABASE_CONNECTION_TIMEOUT', 'Check database reachability, host, port, and network access.']],
+])
+
+// Deliberately omit arbitrary messages, stacks, SQL details, URLs, and bodies.
 function logError(event, error) {
   const code = typeof error?.code === 'string' && /^[A-Z0-9_]{2,40}$/.test(error.code) ? error.code : 'UNEXPECTED_ERROR'
+  const diagnostic = event === 'startup_failed' ? startupHints.get(error?.message) : undefined
+  if (diagnostic) {
+    console.error(JSON.stringify({ event, code: diagnostic[0], hint: diagnostic[1] }))
+    return
+  }
   console.error(JSON.stringify({ event, code }))
+}
+
+async function startupStep(stage, run) {
+  console.log(JSON.stringify({ event: 'startup_step', stage }))
+  return await run()
 }
 
 function installShutdown(server, pool, stopWorker, processRef = process, timeoutMs = 25000) {
@@ -59,4 +80,4 @@ function installShutdown(server, pool, stopWorker, processRef = process, timeout
   return shutdown
 }
 
-module.exports = { runtimeConfig, validatePaymentCallback, logError, installShutdown }
+module.exports = { runtimeConfig, validatePaymentCallback, logError, startupStep, installShutdown }

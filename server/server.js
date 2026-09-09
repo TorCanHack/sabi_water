@@ -3,7 +3,7 @@ const express = require('express')
 const cors = require('cors')
 const { pool, initializeDatabase } = require('./src/database')
 const { hashPassword, verifyPassword } = require('./src/passwords')
-const { runtimeConfig, validatePaymentCallback, logError, installShutdown } = require('./src/runtime')
+const { runtimeConfig, validatePaymentCallback, logError, startupStep, installShutdown } = require('./src/runtime')
 
 const { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder, consumeOrderCart } = require('./src/paystack')
 
@@ -418,14 +418,16 @@ app.use((error, _request, response, _next) => {
 })
 
 async function start() {
-  const payment = paymentConfig()
-  validatePaymentCallback(payment, config.origins)
-  await initializeDatabase()
-  await pool.query('DELETE FROM customer_sessions WHERE expires_at <= NOW()')
-  const server = await new Promise((resolve, reject) => {
+  await startupStep('payment_configuration', () => {
+    const payment = paymentConfig()
+    validatePaymentCallback(payment, config.origins)
+  })
+  await startupStep('database_initialization', initializeDatabase)
+  await startupStep('session_cleanup', () => pool.query('DELETE FROM customer_sessions WHERE expires_at <= NOW()'))
+  const server = await startupStep('http_listen', () => new Promise((resolve, reject) => {
     const listener = app.listen(config.port, config.host, () => resolve(listener))
     listener.once('error', reject)
-  })
+  }))
   const stopWorker = startRefundWorker(pool)
   installShutdown(server, pool, stopWorker)
   console.log(`Sabi Water API listening on ${config.host}:${config.port}`)

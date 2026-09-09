@@ -210,3 +210,17 @@ messages, SQL, request bodies, and credentials.
 
 Local tests: `npm test --prefix server`. Database integration tests require an
 explicit disposable `TEST_DATABASE_URL`; do not point them at production.
+
+## Diagnosing startup failures
+
+`startup_step` logs identify payment configuration, database initialization,
+session cleanup, and HTTP listening. The last step before `startup_failed`
+identifies where startup stopped. Known configuration failures have a specific
+code and a fixed hint; arbitrary exception messages and credentials stay hidden.
+
+For `PAYSTACK_CALLBACK_HTTPS_REQUIRED`, update `PAYSTACK_CALLBACK_URL` to the
+hosted frontend's HTTPS URL plus `/?payment=return`. Updating `FRONTEND_URL`
+alone does not update the payment callback. `DATABASE_CONFIG_MISSING` means the
+database settings must be supplied in the backend service's hosting environment.
+If a failure still has `UNEXPECTED_ERROR`, report it together with the last
+`startup_step` rather than sharing environment file contents.
