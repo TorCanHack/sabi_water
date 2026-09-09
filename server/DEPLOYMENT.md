@@ -56,6 +56,38 @@ Render references: [Node deployment](https://render.com/docs/deploy-node-express
 
 ## Frontend routing and cookies
 
+### Local frontend with a hosted backend
+
+While the frontend runs only on your PC, explicitly set these variables on the
+hosted backend, then redeploy the updated code:
+
+```dotenv
+FRONTEND_URL=http://localhost:5174
+PAYSTACK_MODE=test
+PAYSTACK_CALLBACK_URL=http://localhost:5174/?payment=return
+```
+
+Keep `NODE_ENV=production` on the hosted backend. HTTP origins are allowed only
+for loopback hosts (`localhost`, `127.0.0.1`, `[::1]`); HTTP payment callbacks
+also require test mode and an origin listed in `FRONTEND_URL`. Live payment
+callbacks still require HTTPS. The production frontend origin must be explicitly
+set; a missing value produces a configuration error.
+
+Create `front_end/.env.local` on your PC with your real backend URL:
+
+```dotenv
+API_PROXY_TARGET=https://YOUR_SERVICE.onrender.com
+```
+
+Restart `npm run dev --prefix front_end` and open `http://localhost:5174`.
+Vite proxies relative `/api` requests to the hosted API; the target variable is
+used only by the dev server, not exposed in the client bundle. See
+[Vite's proxy configuration](https://vite.dev/config/server-options#server-proxy).
+Use `localhost` consistently for testing cookies. The Paystack webhook must
+still use the publicly reachable backend URL, never localhost.
+
+### Deployed frontend
+
 The current frontend calls relative `/api` URLs and uses secure, HTTP-only,
 `SameSite=Lax` session cookies in production. Configure your frontend host to
 reverse-proxy `/api/*` to this backend, preserving the full path, cookies, and

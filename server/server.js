@@ -3,7 +3,7 @@ const express = require('express')
 const cors = require('cors')
 const { pool, initializeDatabase } = require('./src/database')
 const { hashPassword, verifyPassword } = require('./src/passwords')
-const { runtimeConfig, logError, installShutdown } = require('./src/runtime')
+const { runtimeConfig, validatePaymentCallback, logError, installShutdown } = require('./src/runtime')
 
 const { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder, consumeOrderCart } = require('./src/paystack')
 
@@ -419,9 +419,7 @@ app.use((error, _request, response, _next) => {
 
 async function start() {
   const payment = paymentConfig()
-  if (process.env.NODE_ENV === 'production' && payment.enabled && !payment.callback.startsWith('https://')) {
-    throw new Error('Production PAYSTACK_CALLBACK_URL must use HTTPS.')
-  }
+  validatePaymentCallback(payment, config.origins)
   await initializeDatabase()
   await pool.query('DELETE FROM customer_sessions WHERE expires_at <= NOW()')
   const server = await new Promise((resolve, reject) => {

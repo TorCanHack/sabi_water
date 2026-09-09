@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const { EventEmitter } = require('node:events')
-const { runtimeConfig, logError, installShutdown } = require('../src/runtime')
+const { runtimeConfig, validatePaymentCallback, logError, installShutdown } = require('../src/runtime')
 const { databaseConfig } = require('../src/databaseConfig')
 
 test('deployment configuration supports direct hosting and trusted production proxies', () => {
@@ -9,10 +9,30 @@ test('deployment configuration supports direct hosting and trusted production pr
   assert.deepEqual(runtimeConfig({ NODE_ENV: 'production', FRONTEND_URL: 'https://shop.example.com', PORT: '10000', TRUST_PROXY: '1' }), {
     host: '0.0.0.0', port: 10000, trustProxy: 1, origins: ['https://shop.example.com'],
   })
-  assert.throws(() => runtimeConfig({ NODE_ENV: 'production' }), /HTTPS/)
+  assert.throws(() => runtimeConfig({ NODE_ENV: 'production' }), /Set FRONTEND_URL/)
   assert.throws(() => runtimeConfig({ FRONTEND_URL: 'https://shop.example.com/' }), /origins/)
   assert.throws(() => runtimeConfig({ PORT: 'invalid' }), /PORT/)
   assert.throws(() => runtimeConfig({ TRUST_PROXY: 'true' }), /TRUST_PROXY/)
+})
+
+test('production allows explicit loopback frontend testing but rejects public HTTP origins', () => {
+  for (const origin of ['http://localhost:5174', 'http://127.0.0.1:5174', 'http://[::1]:5174']) {
+    assert.deepEqual(runtimeConfig({ NODE_ENV: 'production', FRONTEND_URL: origin }).origins, [origin])
+  }
+  for (const origin of ['http://shop.example.com', 'http://localhost.example.com', 'http://192.168.1.2:5174']) {
+    assert.throws(() => runtimeConfig({ NODE_ENV: 'production', FRONTEND_URL: origin }), /HTTPS/)
+  }
+})
+
+test('HTTP loopback payment returns require test mode and a configured frontend origin', () => {
+  const env = { NODE_ENV: 'production' }
+  const origins = ['http://localhost:5174']
+  const payment = { enabled: true, mode: 'test', callback: 'http://localhost:5174/?payment=return' }
+  assert.doesNotThrow(() => validatePaymentCallback(payment, origins, env))
+  assert.throws(() => validatePaymentCallback({ ...payment, mode: 'live' }, origins, env), /HTTPS/)
+  assert.throws(() => validatePaymentCallback(payment, [], env), /HTTPS/)
+  assert.throws(() => validatePaymentCallback({ ...payment, callback: 'http://example.com' }, origins, env), /HTTPS/)
+  assert.doesNotThrow(() => validatePaymentCallback({ ...payment, mode: 'live', callback: 'https://shop.example.com/?payment=return' }, origins, env))
 })
 
 test('database TLS verifies certificates and rejects conflicting configuration', () => {
