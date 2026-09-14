@@ -81,7 +81,9 @@
 
 .address-book-heading{display:flex;align-items:center;gap:10px}.address-book-heading>span{display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;border-radius:50%;background:#cfe8ff;color:#0754a6}.address-book-heading svg{width:19px;height:19px}
 
-.cart-icon{width:20px;height:20px;flex-shrink:0}
+.header nav button>svg{width:20px;height:20px;flex-shrink:0}
+.cart-icon,.receipt-icon{display:inline-block;width:20px;height:20px;flex-shrink:0;vertical-align:middle}
+.text-button:has(>:is(.cart-icon,.receipt-icon)),.back:has(>:is(.cart-icon,.receipt-icon)),.header nav button{display:inline-flex;align-items:center;gap:8px}
 .header>.cart-button.active{border-color:#0754a6;background:#e5f2fc;color:#0754a6;font-weight:600}
 .mobile-page-context{display:none}
 .wallet-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}.wallet-heading h2{margin:0;font-size:22px}.wallet-balance{display:flex;flex-direction:column;gap:8px;margin:24px 0}.wallet-balance span{font-size:12px;color:#526b82}.wallet-balance strong{font-size:36px;font-weight:500;letter-spacing:-1px}.wallet-card .primary:disabled{opacity:1;background:#dae7f2;color:#526b82}.wallet-history{padding:0 4px}

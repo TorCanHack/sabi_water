@@ -1,3 +1,4 @@
+import CartIcon from './CartIcon'
 import { useEffect, useState } from 'react'
 import { apiRequest } from './api'
 import { money } from './data/products'
@@ -75,7 +76,7 @@ export function WalletPanel({ user, wallet, error, navigate }) {
         {!wallet.topupsEnabled && <p>Top-ups are temporarily unavailable. Existing funds remain in your wallet.</p>}
       </form>
       <p>Cancelled wallet orders are refunded here automatically.</p>
-      <button type="button" className="text-button" onClick={() => navigate('shop')}>Shop with your wallet →</button>
+      <button type="button" className="text-button" onClick={() => navigate('shop')}>Shop with your wallet <CartIcon /></button>
     </div>
     {(failure || error) && <p className="error" role="alert">{failure || error}</p>}
     {message && <p role="status">{message}</p>}
