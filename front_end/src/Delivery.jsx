@@ -17,8 +17,8 @@ export function AddressFields({ value, onChange }) {
     {isCovered(value) && <p className="coverage-message" role="status">Eligible for free delivery within Brains &amp; Hammers.</p>}
   </div>
 }
-export function AddressBook({ customer, user }) {
-  const [draft, setDraft] = useState(null)
+export function AddressBook({ customer, user, startAdding = false }) {
+  const [draft, setDraft] = useState(() => startAdding ? emptyAddress() : null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   async function save(event) {

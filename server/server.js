@@ -3,6 +3,7 @@ const express = require('express')
 const cors = require('cors')
 const { pool, initializeDatabase } = require('./src/database')
 const { hashPassword, verifyPassword } = require('./src/passwords')
+const { updateProfile } = require('./src/profile')
 const { runtimeConfig, validatePaymentCallback, logError, startupStep, installShutdown } = require('./src/runtime')
 
 const { paymentConfig, paystack, validSignature, matchesPayment, settlePayment, paymentOrder, consumeOrderCart } = require('./src/paystack')
@@ -223,6 +224,14 @@ async function requireCustomer(request, response, next) {
     next()
   } catch (error) { next(error) }
 }
+
+app.patch('/api/customer/profile', requireCustomer, limitAuthAttempts, async (request, response, next) => {
+  if (request.get('origin') && !allowedOrigins.includes(request.get('origin'))) return response.status(403).json({ error: 'This request origin is not allowed.' })
+  try {
+    const user = await updateProfile(pool, request.customerId, request.body)
+    response.set('Cache-Control', 'no-store').json({ user })
+  } catch (error) { next(error) }
+})
 
 app.get('/api/customer/cart', requireCustomer, async (request, response, next) => {
   try {

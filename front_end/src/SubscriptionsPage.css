@@ -1,0 +1,54 @@
+.subscriptions-page{padding-top:33px;padding-bottom:40px;color:#14365a}
+.subscriptions-page svg{width:22px;height:22px;flex-shrink:0}
+.subscriptions-page .primary{min-height:48px;border-radius:9px;padding:14px 20px;font-size:12px;gap:26px}
+.subscriptions-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:30px}
+.subscriptions-page .eyebrow{font-size:9px;letter-spacing:1.4px;color:#38678f}
+.subscriptions-heading h1{font-size:40px;letter-spacing:-1.5px;line-height:1.2;font-weight:500;margin:12px 0}
+.subscriptions-heading p{font-size:13px;line-height:1.8;color:#61758a;margin:0}
+.subscriptions-coming{display:inline-flex;align-items:center;gap:8px;border:1px solid #d6e3ef;border-radius:20px;padding:9px 13px;font-size:11px;color:#526b82;white-space:nowrap;background:#fff}
+.subscriptions-coming>span{width:6px;height:6px;border-radius:50%;background:#7298ba}
+.subscriptions-hero{display:grid;grid-template-columns:1.15fr 1fr;background:#eaf4fe;border:1px solid #d8e8f6;border-radius:21px;overflow:hidden}
+.subscriptions-hero-copy{padding:40px 16px 42px 42px;position:relative;z-index:1}
+.subscriptions-icon{display:grid;place-items:center;width:44px;height:44px;border:1px solid #dce9f5;border-radius:12px;background:#edf5fd;color:#286ba7;flex-shrink:0}
+.subscriptions-hero-copy>.subscriptions-icon{background:white;margin-bottom:25px}
+.subscriptions-kicker{font-size:9px;letter-spacing:1.7px;color:#38678f;font-weight:600}
+.subscriptions-hero h2{font-size:47px;line-height:1.1;letter-spacing:-1.8px;font-weight:500;margin:18px 0 21px}
+.subscriptions-hero h2 em{font-family:Georgia,'Times New Roman',serif;font-weight:400;color:#216eb5}
+.subscriptions-hero-copy>p{font-size:13px;line-height:1.9;color:#526b82;max-width:385px;margin:0}
+.subscriptions-availability{padding:17px 0 0;margin:23px 0;border-top:1px solid #cedfef;max-width:385px}
+.subscriptions-availability strong{display:block;font-size:11px;font-weight:600;line-height:1.8}
+.subscriptions-availability span{display:block;font-size:11px;line-height:1.8;color:#61758a;margin-top:5px}
+.subscriptions-art{position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;min-width:0;isolation:isolate;background:radial-gradient(ellipse at center,#d0e7fc 0%,#eaf4fe 69%);overflow:hidden;padding:42px 20px}
+.subscriptions-orbit{position:absolute;width:430px;height:430px;border:1px solid #bcd8ef80;border-radius:50%;z-index:-1}
+.subscriptions-orbit.inner{width:350px;height:350px;border-style:dashed;border-color:#b4d2e9}
+.subscriptions-bottle-card{position:relative;width:245px;background:#ffffffed;border:1px solid #fff;border-radius:19px;padding:25px 22px 24px;text-align:center;box-shadow:0 16px 36px #14365a10;transform:rotate(-5deg)}
+.subscriptions-bottle-card>span{font-size:7px;letter-spacing:1.7px;color:#61758a}
+.subscriptions-bottle-card img{display:block;object-fit:contain;width:100%;height:250px;margin:16px auto 10px;mix-blend-mode:multiply}
+.subscriptions-bottle-card strong{display:block;font-size:21px;font-family:Georgia,serif;font-style:italic;font-weight:400;color:#286ba7}
+.subscriptions-bottle-card small{display:block;font-size:10px;color:#61758a;margin-top:9px}
+.subscriptions-orbit-icon{position:absolute;z-index:1;top:80px;right:36px;display:grid;place-items:center;width:61px;height:61px;background:#0754a6;color:#fff;border:6px solid #eaf4fe;border-radius:50%;box-shadow:0 2px 0 #c7dff3}
+.subscriptions-art-caption{font-size:7px;letter-spacing:1.7px;color:#61758a;text-align:center;position:relative;margin-top:31px}
+.subscriptions-today{padding-top:43px;padding-bottom:40px}
+.subscriptions-section-heading h2{font-size:29px;font-weight:500;line-height:1.3;letter-spacing:-1px;margin:12px 0 9px}
+.subscriptions-section-heading p{font-size:12px;line-height:1.8;color:#61758a;margin:0}
+.subscriptions-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-top:26px}
+.subscriptions-options article{display:flex;flex-direction:column;padding:25px;background:#fff;border:1px solid #dee7ef;border-radius:13px;min-width:0}
+.subscriptions-options h3{font-size:16px;font-weight:600;line-height:1.5;letter-spacing:-.3px;margin:19px 0 10px}
+.subscriptions-options p{font-size:12px;line-height:1.85;color:#61758a;margin:0 0 17px;flex:1}
+.subscriptions-options button{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:44px;padding:10px 0 0;font-size:11px;font-weight:600;color:#0754a6;border-top:1px solid #e5edf4;text-align:left}
+.subscriptions-options button:hover{text-decoration:underline;text-underline-offset:4px}
+.subscriptions-options button svg{width:17px;height:17px}
+.subscriptions-faq{display:grid;grid-template-columns:1fr 1.6fr;gap:55px;padding:35px 0 30px;border-top:1px solid #dee7ef}
+.subscriptions-faq h2{font-size:29px;line-height:1.25;font-weight:500;letter-spacing:-1px;margin:14px 0 12px}
+.subscriptions-faq>div>p{font-size:12px;color:#61758a;line-height:1.85;max-width:230px;margin:0}
+.subscriptions-questions details{border-bottom:1px solid #dee7ef}
+.subscriptions-questions summary{display:flex;align-items:center;justify-content:space-between;gap:20px;list-style:none;cursor:pointer;min-height:64px;padding:20px 0;font-size:12px;font-weight:600;line-height:1.6}
+.subscriptions-questions summary::-webkit-details-marker{display:none}
+.subscriptions-questions summary>span{font-size:20px;font-weight:400;color:#61758a;flex-shrink:0}
+.subscriptions-questions details[open] summary>span{transform:rotate(45deg)}
+.subscriptions-questions details p{font-size:12px;line-height:1.85;color:#61758a;margin:0;padding:0 30px 22px 0}
+.subscriptions-footer-note{display:flex;align-items:center;gap:9px;color:#61758a;padding-top:10px}
+.subscriptions-footer-note svg{width:16px;height:16px}
+.subscriptions-footer-note p{font-size:11px;line-height:1.8;margin:0}
+@media(max-width:1000px){.subscriptions-hero-copy{padding:33px 10px 35px 30px}.subscriptions-hero h2{font-size:40px}.subscriptions-bottle-card{width:210px;padding:22px 18px}.subscriptions-bottle-card img{height:220px}.subscriptions-orbit-icon{top:85px;right:18px}.subscriptions-options{gap:16px}.subscriptions-options article{padding:22px}.subscriptions-faq{gap:35px}.subscriptions-heading .eyebrow{font-size:8px}}
+@media(max-width:700px){.subscriptions-page{padding-top:25px;padding-bottom:30px}.subscriptions-heading{gap:15px;align-items:flex-start;flex-wrap:wrap;margin-bottom:23px}.subscriptions-heading h1{font-size:33px}.subscriptions-heading p{font-size:12px}.subscriptions-heading .eyebrow{font-size:8px;letter-spacing:1px}.subscriptions-coming{font-size:10px;padding:8px 11px}.subscriptions-hero{grid-template-columns:1fr;border-radius:17px}.subscriptions-hero-copy{padding:28px 25px 10px}.subscriptions-hero-copy>.subscriptions-icon{margin-bottom:23px}.subscriptions-hero h2{font-size:38px;letter-spacing:-1.5px;margin-bottom:18px}.subscriptions-hero-copy>p{font-size:12px}.subscriptions-hero-copy .primary{font-size:11px;gap:22px}.subscriptions-art{padding:37px 20px 25px}.subscriptions-bottle-card{width:205px;padding:19px 18px}.subscriptions-bottle-card img{height:190px;margin:12px auto}.subscriptions-orbit{width:320px;height:320px}.subscriptions-orbit.inner{width:265px;height:265px}.subscriptions-orbit-icon{top:37px;right:calc(50% - 125px);width:54px;height:54px}.subscriptions-art-caption{margin-top:28px;font-size:6px;letter-spacing:1.4px}.subscriptions-today{padding-top:32px;padding-bottom:30px}.subscriptions-section-heading h2{font-size:26px;letter-spacing:-.8px}.subscriptions-options{grid-template-columns:1fr;gap:14px;margin-top:23px}.subscriptions-options article{padding:23px}.subscriptions-options h3{margin-top:16px;font-size:17px}.subscriptions-options p{font-size:12px;max-width:400px}.subscriptions-options button{font-size:12px;padding-top:12px;min-height:46px}.subscriptions-faq{grid-template-columns:1fr;gap:15px;padding-top:28px;padding-bottom:25px}.subscriptions-faq h2{font-size:27px}.subscriptions-faq h2 br{display:none}.subscriptions-faq>div>p{max-width:none}.subscriptions-questions summary{font-size:12px;gap:18px}.subscriptions-questions details p{padding-right:10px}.subscriptions-footer-note{align-items:flex-start}.subscriptions-footer-note svg{margin-top:3px}.subscriptions-footer-note p{font-size:10px}}
